@@ -2,13 +2,8 @@
 layout: main
 title: Study Guides
 ---
-<p>
-	We are currently trying to make more study guides.
-	You can view a list of finished ones 
-	<a href="https://docs.google.com/folder/d/0B4pKCnO2NaBvYnQ4a3g3ZmZjZWc/edit" target="_blank">in Google Drive</a>.
-</p>
-<p>
-	You can also view the old 
-	<a href="https://sites.google.com/site/uncochubstersstudyguides/home" target="_blank">Unco Chubster's Study Guides</a> 
-	Google Site from 6th grade.
-</p>
+<ul>
+	{% for post in site.posts %}
+		<li><a href="{{ post.url }}">{{ post.title }}</a> <i>updated {{ post.date | date_to_long_string }}</i></li>
+	{% endfor %}
+</ul>
