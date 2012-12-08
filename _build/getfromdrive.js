@@ -10,6 +10,14 @@ const API_KEY = "AIzaSyDBqsptgXpewQnSy3cf1MRPyoaA7dwS5sE";
 //const FOLDER = "0B4pKCnO2NaBvejc5eGJDMGV0SVE";
 const FOLDER = "0B4pKCnO2NaBvYnQ4a3g3ZmZjZWc";
 
+function zeroPad(n) {
+	n += "";
+	while (n.length < 2) {
+		n = "0" + n;
+	}
+	return n;
+}
+
 https.request("https://www.googleapis.com/drive/v2/files?q='" + FOLDER + "'+in+parents&key=" + API_KEY, function(res) {
 	res.setEncoding("utf8");
 	var data = '';
@@ -45,12 +53,17 @@ https.request("https://www.googleapis.com/drive/v2/files?q='" + FOLDER + "'+in+p
 					data2 += chunk;
 				});
 				res2.on('end', function() {
-					var filename = item.title.replace(/\s/g, "-") + ".html";
+					var date = new Date(item.modifiedDate);
+					var filename = 
+						zeroPad(date.getUTCFullYear()) + "-" + 
+						zeroPad(date.getUTCMonth()) + "-" + 
+						zeroPad(date.getUTCDate()) + "-" + 
+						item.title.replace(/\s/g, "-") + ".html";
+					
 					var frontMatter =
 						"---\n" +
 						"layout: post\n" +
 						"title: " + item.title + "\n" +
-						"permalink: " + "/studyguides/" + filename + "\n" +
 						"---\n";
 					fs.writeFileSync(destination + filename, frontMatter + data2);
 					console.log("saved");
