@@ -1,0 +1,9 @@
+---
+layout: main
+title: Study Guides
+---
+<ul>
+	{% for post in site.posts %}
+		<li><a href="{{ post.url }}" target="_blank">{{ post.title }}</a> <i>updated {{ post.date | date_to_long_string }}</i></li>
+	{% endfor %}
+</ul>
