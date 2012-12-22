@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>CanvasPad</title>
+<meta charset="utf-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge;chrome=1"/>
+<meta name="author" content="Desklamp Studios"/>
+<link rel="stylesheet" href="normalize.css"/>
+<!--
+This project was inspired by
+https://github.com/antimatter15/scratchpad
+http://intridea.github.com/sketch.js/
+-->
+<style>
+#canvas {
+	position: absolute;
+	left: 0;
+	top: 0;
+	outline: 1px solid red;
+	width: 100%;
+	hight: 100%;
+}
+#toolbar {
+	position: absolute;
+	left: 10px;
+	top: 10px;
+	z-index: 2;
+	
+	-webkit-user-select: none;
+	   -moz-user-select: none;
+	        user-select: none;
+}
+#toolbar button {
+	border: 1px solid #ccc;
+	background-color: white;
+	height: 40px;
+	width: 40px;
+	overflow: hidden;
+	text-align: center;
+	margin: 0;
+	position: relative;
+	-webkit-transition: 0.5s ease;
+	   -moz-transition: 0.5s ease;
+	    -ms-transition: 0.5s ease;
+	     -o-transition: 0.5s ease;
+}
+#toolbar button.selected {
+	top: 10px;
+}
+#toolbar > div {
+	margin-right: 10px;
+	display: inline-block;
+}
+#size {
+	height: 40px;
+	margin: 0;
+}
+
+</style>
+<script src="whammy.js"></script>
+<script>
+var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
+                              window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+var cancelAnimationFrame = window.cancelAnimationFrame || window.mozCancelAnimationFrame ||
+                              window.webkitCancelAnimationFrame || window.msCancelAnimationFrame;
+
+var canvas, ctx, tool = "pen", mousedown = false;
+
+var scale = 1;
+
+var recording = false, worker = null;
+/*
+function record() {
+	if (recording) {
+		recording = false;
+		cancelAnimationFrame(id);
+		worker.postMessage({status: "done"});
+		return;
+	}
+	recording = true;
+	worker = new Worker("worker.js");
+	worker.onerror = function(e) { throw e;	};
+	worker.onmessage = function(e) {
+		console.log(e.data.url);
+	};
+	var id, lastDate = Date.now(), meter = $("framerate");
+	recordLoop();
+	
+	function recordLoop() {
+		if (!recording) return;
+		var date = Date.now();
+		var dataURI = canvas.toDataURL("image/webp", 0.5);
+		var time = date - lastDate;
+		worker.postMessage({dataURI: dataURI, time: time});
+		meter.innerHTML = Math.round(1000 / time);
+		lastDate = date;
+		id = requestAnimationFrame(recordLoop);
+	}
+}*/
+var encoder, frames;
+
+var Record = function() {
+	this.recording = false;
+	this.encoder = new Whammy.Video(undefined, 0.5);
+	
+	this.lastId = "";
+	this.lastDate = null;
+	
+	this.frames = [];
+	this.times = [];
+	
+	this.worker = new Worker("worker.js");
+};
+Record.prototype.toggle = function() {
+	if (!this.recording) {
+		this.start();
+	} else {
+		var _this = this;
+		setTimeout(function() {
+			_this.stop();
+		}, 0);
+	}
+};
+Record.prototype.start = function() {
+	var _canvas = canvas, _ctx = ctx;
+	var _width = canvas.width, _height = canvas.height;
+	var _meter = $("framerate");
+	this.lastDate = Date.now() - 10;
+	this.recording = true;
+	
+	var lastmousedown = mousedown;
+	
+	var recordLoop = function() {
+		if (!this.recording) return;
+		var now = Date.now(), time = now - this.lastDate;
+		if (time < 30 || (!mousedown && !lastmousedown)) {
+			requestAnimationFrame(recordLoop);
+			return;
+		}
+		lastmousedown = mousedown;
+		
+		this.frames.push(_ctx.getImageData(0, 0, _width, _height));
+		/*
+		var _this = this;
+		setTimeout(function() {
+			_this.frames.push(_canvas.toDataURL("image/webp", 0.5));
+		}, 0);*/
+		this.times.push(time);
+		
+		_meter.innerHTML = (1000 / time).toFixed(2);
+		this.lastDate = now;
+		requestAnimationFrame(recordLoop);
+	}.bind(this);
+	
+	recordLoop();
+};
+Record.prototype.stop = function() {
+	this.recording = false;
+	cancelAnimationFrame(this.id);
+	
+	var _ctx = ctx, frames = this.frames, times = this.times;
+	for (var i = 0, len = frames.length; i < len; i++) {
+		_ctx.putImageData(frames[i], 0, 0);
+		this.encoder.add(_ctx, times[i]);
+		//this.encoder.add(frames[i], times[i]);
+	}
+	var blob = this.encoder.compile();
+	var url = window.URL.createObjectURL(blob);
+	console.log(url);
+	window.open(url);
+	
+	record = new Record();
+};
+
+var record = new Record();
+
+
+var undoStack = new Array(20);
+undoStack.add = function() {
+	undoStack.shift();
+	undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+};
+undoStack.cancel = function() {
+	var imageData = undoStack.getLast();
+	if (!imageData) return false;
+	ctx.fillStyle = "#ffffff";
+	ctx.fillRect(0, 0, canvas.width, canvas.height);
+	ctx.putImageData(imageData, 0, 0);
+	
+	/*
+	var img = new Image();
+	var dataURI = undoStack.getLast();
+	if (!dataURI) return false;
+	
+	img.onload = function() {
+		if (canvas.width == img.width && canvas.height == img.height) {
+			ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+		} else {
+			canvas.width = img.width;
+			canvas.height = img.height;
+			ctx.drawImage(img, 0, 0, img.width, img.height);
+			window.onresize();
+		}
+	};
+	img.src = dataURI;
+	*/
+};
+undoStack.undo = function() {
+	undoStack.pop();
+	undoStack.unshift(undefined);
+	undoStack.cancel();
+};
+undoStack.getLast = function() {
+	return undoStack[undoStack.length - 1];
+};
+
+function modifyAllClass(nodes, className, action) {
+	for (var i = 0; i < nodes.length; i++) {
+		if (nodes[i].nodeType == 1) {
+			nodes[i].classList[action](className);
+		}
+	}
+}
+
+var colors = ["#ffffff", "#000000", "#3f3f3f", "#7f7f7f", "#bfbfbf", "#ff0000", "#ff7f00", "#ffff00", "#00ff00", "#00ffff", "#007fff", "#0000ff", "#7f00ff"];
+
+var tools = [
+	{
+		name: "record",
+		html: "rec",
+		action: function() {
+			record.toggle();
+		}
+	},
+	{
+		name: "pen",
+		html: "pen",
+		action: "select"
+	},
+	{
+		name: "clear",
+		html: "clear",
+		action: function() {
+			ctx.fillStyle = "#ffffff";
+			ctx.fillRect(0, 0, canvas.width, canvas.height);
+		}
+	},
+	{
+		name: "undo",
+		html: "undo",
+		action: function() {
+			undoStack.undo();
+		}
+	}
+];
+
+function pythag(x,y) { return Math.sqrt(x*x + y*y); }
+function $(id) { return document.getElementById(id); }
+window.onload = function() {
+	canvas = $("canvas");
+	ctx = canvas.getContext("2d");
+	window.onresize();
+	ctx.lineWidth = 4;
+	ctx.strokeStyle = "#000000";
+	ctx.fillStyle = "#ffffff";
+	ctx.fillRect(0, 0, canvas.width, canvas.height);
+	undoStack.add();
+	
+	tools.forEach(function(curTool) {
+		var btn = document.createElement("button");
+		btn.innerHTML = curTool.html || "&nbsp";
+		btn.onclick = function() {
+			if (curTool.action == "select") {
+				modifyAllClass($("tools").childNodes, "selected", "remove");
+				this.classList.add("selected");
+			} else {
+				curTool.action();
+			}
+		};
+		if (curTool.name == tool) {
+			btn.classList.add("selected");
+		}
+		$("tools").appendChild(btn);
+	});
+	
+	colors.forEach(function(color) {
+		var btn = document.createElement("button");
+		btn.innerHTML = "&nbsp";
+		btn.onclick = function() {
+			modifyAllClass($("colors").childNodes, "selected", "remove");
+			this.classList.add("selected");
+			ctx.strokeStyle = color;
+		};
+		if (color == ctx.strokeStyle) {
+			btn.classList.add("selected");
+		}
+		btn.style.backgroundColor = color;
+		$("colors").appendChild(btn);
+	});
+	
+	$("size").onchange = function() {
+		ctx.lineWidth = this.value;
+	};
+	
+	window.onkeydown = function(e){
+		if (e.ctrlKey && e.keyCode == 'Z'.charCodeAt(0)){
+			e.preventDefault();
+			undoStack.undo();
+		}
+	};
+	
+	canvas.onmousedown = canvas.ontouchstart = function(e) {
+		var x = e.offsetX * scale, y = e.offsetY * scale;
+		
+		if (tool == "pen") {
+			ctx.lineJoin = "round";
+			ctx.lineCap = "round";
+			
+			ctx.beginPath();
+			ctx.moveTo(x - 0.01, y - 0.01);
+			ctx.lineTo(x + 0.01, y + 0.01);
+			ctx.stroke();
+		}
+		
+		mousedown = [x, y];
+	};
+	canvas.onmousemove = canvas.ontouchmove = function(e) {
+		if (mousedown) {
+			var x = e.offsetX * scale, y = e.offsetY * scale;
+			if (tool == "pen") {
+				var oldX = mousedown[0], oldY = mousedown[1];
+				ctx.beginPath();
+				ctx.moveTo(mousedown[0], mousedown[1]);
+				ctx.lineTo(x, y);
+				ctx.stroke();
+			}
+			mousedown = [x, y];
+		}
+	};
+	canvas.onmouseup = canvas.ontouchend = function(e) {
+		mousedown = false;
+		undoStack.add();
+	};
+};
+window.onresize = function() {
+	canvas.width = window.innerWidth * scale;
+	canvas.height = window.innerHeight * scale;
+};
+</script>
+</head>
+
+<body>
+<div id="toolbar">
+	<div id="tools">
+		<span>fps: <span id="framerate"></span></span>
+	</div>
+	<div id="colors">
+	</div>
+	<div id="size_container">
+		<select id="size">
+			<option>0.5</option>
+			<option>1</option>
+			<option selected>2</option>
+			<option>4</option>
+			<option>8</option>
+			<option>16</option>
+			<option>32</option>
+			<option>64</option>
+		</select>
+	</div>
+</div>
+<canvas id="canvas" width="500" height="500"></canvas>
+</body>
+</html>
