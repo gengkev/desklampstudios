@@ -1,0 +1,26 @@
+.inline-image {
+	margin: 10px;
+}
+#top-thing > img {
+	margin-right: 10px;
+}
+#sections > .button {
+	width: 100%;
+	margin: 0 0 10px 0;
+	text-align: left;
+}
+#sections > .button:nth-of-type(1) {
+	background-color: #DD1E2F;
+}
+#sections > .button:nth-of-type(2) {
+	background-color: #EBB035;
+}
+#sections > .button:nth-of-type(3) {
+	background-color: #218559;
+}
+#sections > .button:nth-of-type(4) {
+	background-color: #06A2CB;
+}
+#sections > .button:nth-of-type(5) {
+	background-color: #D0C6B1;
+}
